@@ -5,10 +5,30 @@ import (
 	"reflect"
 	"testing"
 	"github.com/golang/glog"
+	"os/exec"
+	"encoding/json"
 )
 
-func getSessions(t *testing.T) (
-	credentialsSession *AviSession, authTokenSession *AviSession) {
+// Function that generates auth token from django
+// In future, this will become an internal API
+func getAuthToken() string {
+	output, err := exec.Command("/opt/avi/python/bin/portal/manage.py", "gen_auth_token", "--user", "admin", "--hours", "12").Output()
+	if err != nil {
+		glog.Infof("ERROR: %s", err)
+		return ""
+	}
+	var jsonData interface{}
+	err = json.Unmarshal(output, &jsonData)
+	if err != nil {
+		glog.Infof("ERROR: %s", err)
+		return ""
+	}
+	jsonDataMap := jsonData.(map[string]interface{})
+	authToken := jsonDataMap["token"].(string)
+	return authToken
+}
+
+func getSessions(t *testing.T) []*AviSession {
 	/* Test username/password authentication */
 	credentialsSession, err := NewAviSession("10.10.25.201",
 		"admin", SetPassword("avi123"), SetInsecure)
@@ -17,14 +37,25 @@ func getSessions(t *testing.T) (
 	}
 
 	/* Test token authentication */
-	authTokenSession, err = NewAviSession("localhost", "admin",
-		SetTokenAuth, SetInsecure)
+	authToken := getAuthToken()
+	authTokenSession, err := NewAviSession("localhost", "admin",
+		SetAuthToken(authToken), SetInsecure)
 
 	if err != nil {
 		t.Fatalf("Session Creation failed: %s", err)
 	}
 
-	return credentialsSession, authTokenSession
+	/* Test token authentication with provided callback function */
+	authTokenSessionCallback, err := NewAviSession("localhost", "admin",
+		SetAuthToken("wrong-token"),
+			SetRefreshAuthTokenCallback(getAuthToken),
+				SetInsecure)
+
+	if err != nil {
+		t.Fatalf("Session Creation failed: %s", err)
+	}
+
+	return []*AviSession{credentialsSession, authTokenSession, authTokenSessionCallback}
 }
 
 func testAviSession(t *testing.T, avisess *AviSession) {
@@ -108,13 +139,13 @@ func testAviPool(t *testing.T, avisess *AviSession) {
 }
 
 func TestAviSession(t *testing.T) {
-	credentialsSession, authTokenSession := getSessions(t)
-	testAviSession(t, credentialsSession)
-	testAviSession(t, authTokenSession)
+	for _, session := range getSessions(t) {
+		testAviSession(t, session)
+	}
 }
 
 func TestAviPool(t *testing.T) {
-	credentialsSession, authTokenSession := getSessions(t)
-	testAviPool(t, credentialsSession)
-	testAviPool(t, authTokenSession)
+	for _, session := range getSessions(t) {
+		testAviPool(t, session)
+	}
 }
