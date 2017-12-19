@@ -31,7 +31,7 @@ func getAuthToken() string {
 func getSessions(t *testing.T) []*AviSession {
 	/* Test username/password authentication */
 	credentialsSession, err := NewAviSession("10.10.25.201",
-		"admin", SetPassword("avi123"), SetInsecure)
+		"admin", SetPassword("password"), SetInsecure)
 	if err != nil {
 		t.Fatalf("Session Creation failed: %s", err)
 	}
@@ -47,7 +47,6 @@ func getSessions(t *testing.T) []*AviSession {
 
 	/* Test token authentication with provided callback function */
 	authTokenSessionCallback, err := NewAviSession("localhost", "admin",
-		SetAuthToken("wrong-token"),
 			SetRefreshAuthTokenCallback(getAuthToken),
 				SetInsecure)
 

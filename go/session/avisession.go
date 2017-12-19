@@ -131,6 +131,11 @@ func NewAviSession(host string, username string, options ...func(*AviSession) er
 	}
 
 	if avisess.isTokenAuth() {
+		// If auth token not provided, but callback function provided,
+		// then set token
+		if avisess.authToken == "" && avisess.refreshAuthToken != nil {
+			avisess.setAuthToken(avisess.refreshAuthToken())
+		}
 		return avisess, nil
 	} else {
 		err := avisess.initiateSession()
@@ -233,7 +238,7 @@ func SetInsecure(avisess *AviSession) error {
 }
 
 func (avisess *AviSession) isTokenAuth() bool {
-	return avisess.authToken != ""
+	return avisess.authToken != "" || avisess.refreshAuthToken != nil
 }
 
 //
