@@ -148,3 +148,28 @@ func TestAviPool(t *testing.T) {
 		testAviPool(t, session)
 	}
 }
+
+func bogusAuthTokenFunction() string {
+	return "incorrect-auth-token"
+}
+
+func TestTokenAuthRobustness(t *testing.T) {
+	/* Test token authentication with provided callback function */
+	authTokenSessionCallback, err := NewAviSession("localhost", "admin",
+		SetRefreshAuthTokenCallback(bogusAuthTokenFunction),
+		SetInsecure)
+
+	var res interface{}
+	err = authTokenSessionCallback.Get("api/tenant", &res)
+	if err == nil {
+		t.Fatalf("ERROR: Expected an error from incorrect token auth")
+	}
+
+	authTokenSession, err := NewAviSession("localhost", "admin",
+		SetAuthToken("wrong-auth-token"),
+		SetInsecure)
+	err = authTokenSession.Get("api/tenant", &res)
+	if err == nil {
+		t.Fatalf("ERROR: Expected an error from incorrect token auth")
+	}
+}

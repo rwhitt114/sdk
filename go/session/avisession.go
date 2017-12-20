@@ -13,6 +13,7 @@ import (
 	"net/http/httputil"
 	"reflect"
 	"github.com/golang/glog"
+	"time"
 )
 
 type aviResult struct {
@@ -247,9 +248,33 @@ func (avisess *AviSession) isTokenAuth() bool {
 
 // restRequest makes a REST request to the Avi Controller's REST API.
 // Returns a byte[] if successful
-func (avisess *AviSession) restRequest(verb string, uri string, payload interface{}) ([]byte, error) {
+func (avisess *AviSession) restRequest(verb string, uri string, payload interface{}, retryNum ...int) ([]byte, error) {
+
 	var result []byte
 	url := avisess.prefix + uri
+
+	// If optional retryNum arg is provided, then count which retry number this is
+	retry := 0
+	if len(retryNum) > 0 {
+		retry = retryNum[0]
+	}
+
+	// On subsequent retries, wait a bit before retrying.
+	// If not our first 3 tries, stop trying
+	if retry == 1 {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if retry == 2 {
+		time.Sleep(500 * time.Millisecond)
+	}
+	if retry == 3 {
+		time.Sleep(1 * time.Second)
+	}
+	if retry > 3 {
+		errorResult := AviError{verb: verb, url: url}
+		errorResult.err = fmt.Errorf("tried 3 times and failed")
+		return nil, errorResult
+	}
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: avisess.insecure},
@@ -322,13 +347,16 @@ func (avisess *AviSession) restRequest(verb string, uri string, payload interfac
 
 	if resp.StatusCode == 419 {
 		// session got reset; try again
-		return avisess.restRequest(verb, uri, payload)
+		return avisess.restRequest(verb, uri, payload, retry+1)
 	}
 
 	if resp.StatusCode == 401 && len(avisess.sessionid) != 0 && uri != "login" {
 		// session expired; initiate session and then retry the request
-		avisess.initiateSession()
-		return avisess.restRequest(verb, uri, payload)
+		err := avisess.initiateSession()
+		if err != nil {
+			return nil, err
+		}
+		return avisess.restRequest(verb, uri, payload, retry+1)
 	}
 
 	if resp.StatusCode == 401 && avisess.isTokenAuth() {
@@ -336,10 +364,17 @@ func (avisess *AviSession) restRequest(verb string, uri string, payload interfac
 		// get new auth token and retry the request
 		if avisess.refreshAuthToken != nil {
 			avisess.setAuthToken(avisess.refreshAuthToken())
-			return avisess.restRequest(verb, uri, payload)
+			return avisess.restRequest(verb, uri, payload, retry+1)
 		} else {
-			emsg := "Invalid Auth Token"
-			errorResult.Message =  &emsg
+			bres, berr := ioutil.ReadAll(resp.Body)
+			if berr == nil {
+				mres, _ := convertAviResponseToMapInterface(bres)
+				emsg := fmt.Sprintf("%v", mres)
+				errorResult.Message = &emsg
+			} else {
+				emsg := "Token Invalid, no refresh token function supplied"
+				errorResult.Message = &emsg
+			}
 			return result, errorResult
 		}
 	}
