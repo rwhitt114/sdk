@@ -60,25 +60,40 @@ def ansible_return(module, rsp, changed, req=None, existing_obj=None,
                 changed=changed, obj=rsp.json(), old_obj=existing_obj,
                 avi_api_context=avi_api_context)
         else:
+            fact_context = module.params.get('avi_api_context', {})
+            if fact_context:
+                fact_context.update({key: avi_api_context})
+            else:
+                fact_context = {key: avi_api_context}
             return module.exit_json(
                 changed=changed, obj=rsp.json(), old_obj=existing_obj,
-                ansible_facts=dict(avi_api_context={key: avi_api_context}))
+                ansible_facts=dict(avi_api_context=fact_context))
     if rsp:
         if module.params['avi_disable_session_cache_as_fact']:
             return module.exit_json(changed=changed, obj=rsp.json(),
                                     avi_api_context=avi_api_context)
         else:
+            fact_context = module.params.get('avi_api_context', {})
+            if fact_context:
+                fact_context.update({key: avi_api_context})
+            else:
+                fact_context = {key: avi_api_context}
             return module.exit_json(
                 changed=changed, obj=rsp.json(), ansible_facts=dict(
-                    avi_api_context={key: avi_api_context}))
+                    avi_api_context=fact_context))
 
     if module.params['avi_disable_session_cache_as_fact']:
         return module.exit_json(changed=changed, obj=existing_obj,
                                 avi_api_context=avi_api_context)
     else:
+        fact_context = module.params.get('avi_api_context', {})
+        if fact_context:
+            fact_context.update({key: avi_api_context})
+        else:
+            fact_context = {key: avi_api_context}
         return module.exit_json(
             changed=changed, obj=existing_obj, ansible_facts=dict(
-                avi_api_context={key: avi_api_context}))
+                avi_api_context=fact_context))
 
 
 def purge_optional_fields(obj, module):
