@@ -66,7 +66,7 @@ def ansible_return(module, rsp, changed, req=None, existing_obj=None,
     old_obj_val = existing_obj if changed and existing_obj else None
     avi_api_context_val = avi_api_context if disable_fact else None
     ansible_facts_val = dict(
-        avi_api_context=fact_context) if not disable_fact else None
+        avi_api_context=fact_context) if not disable_fact else {}
 
     return module.exit_json(
         changed=changed, obj=obj_val, old_obj=old_obj_val,
