@@ -52,48 +52,25 @@ def ansible_return(module, rsp, changed, req=None, existing_obj=None,
     api_creds.update_from_ansible_module(module)
     key = '%s:%s:%s' % (api_creds.controller, api_creds.username,
                         api_creds.port)
+    disable_fact = module.params['avi_disable_session_cache_as_fact']
 
-    if changed and existing_obj:
-
-        if module.params['avi_disable_session_cache_as_fact']:
-            return module.exit_json(
-                changed=changed, obj=rsp.json(), old_obj=existing_obj,
-                avi_api_context=avi_api_context)
-        else:
-            fact_context = module.params.get('avi_api_context', {})
-            if fact_context:
-                fact_context.update({key: avi_api_context})
-            else:
-                fact_context = {key: avi_api_context}
-            return module.exit_json(
-                changed=changed, obj=rsp.json(), old_obj=existing_obj,
-                ansible_facts=dict(avi_api_context=fact_context))
-    if rsp:
-        if module.params['avi_disable_session_cache_as_fact']:
-            return module.exit_json(changed=changed, obj=rsp.json(),
-                                    avi_api_context=avi_api_context)
-        else:
-            fact_context = module.params.get('avi_api_context', {})
-            if fact_context:
-                fact_context.update({key: avi_api_context})
-            else:
-                fact_context = {key: avi_api_context}
-            return module.exit_json(
-                changed=changed, obj=rsp.json(), ansible_facts=dict(
-                    avi_api_context=fact_context))
-
-    if module.params['avi_disable_session_cache_as_fact']:
-        return module.exit_json(changed=changed, obj=existing_obj,
-                                avi_api_context=avi_api_context)
-    else:
+    fact_context = None
+    if not disable_fact:
         fact_context = module.params.get('avi_api_context', {})
         if fact_context:
             fact_context.update({key: avi_api_context})
         else:
             fact_context = {key: avi_api_context}
-        return module.exit_json(
-            changed=changed, obj=existing_obj, ansible_facts=dict(
-                avi_api_context=fact_context))
+
+    obj_val = rsp.json() if rsp else existing_obj
+    old_obj_val = existing_obj if changed and existing_obj else None
+    avi_api_context_val = avi_api_context if disable_fact else None
+    ansible_facts_val = dict(
+        avi_api_context=fact_context) if not disable_fact else None
+
+    return module.exit_json(
+        changed=changed, obj=obj_val, old_obj=old_obj_val,
+        ansible_facts=ansible_facts_val, avi_api_context=avi_api_context_val)
 
 
 def purge_optional_fields(obj, module):
