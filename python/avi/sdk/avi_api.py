@@ -655,10 +655,14 @@ class ApiSession(Session):
                     path, name, tenant, tenant_uuid, timeout=timeout,
                     params=params, **kwargs)
         if resp.status_code > 299:
+            logger.error('Error in get object by name for %s named %s. '
+                         'Error: %s' % (path, name, resp.text))
             return obj
         try:
             obj = resp.json()['results'][0]
         except IndexError:
+            logger.warning('Warning: Object Not found for %s named %s' %
+                           (path, name))
             obj = None
         self._update_session_last_used()
         return obj
