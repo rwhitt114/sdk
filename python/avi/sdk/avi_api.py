@@ -657,7 +657,7 @@ class ApiSession(Session):
         if resp.status_code > 299:
             logger.error('Error in get object by name for %s named %s. '
                          'Error: %s' % (path, name, resp.text))
-            return obj
+            raise AviServerError(resp.text, rsp=resp)
         try:
             obj = resp.json()['results'][0]
         except IndexError:
