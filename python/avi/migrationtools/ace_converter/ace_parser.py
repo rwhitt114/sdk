@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 from pyparsing import Keyword, Word, OneOrMore, printables, Group, nums,\
-    alphas, ZeroOrMore, Optional, Combine, QuotedString
+    alphas, ZeroOrMore, Optional, Combine, QuotedString, restOfLine
 from itertools import cycle
 from avi.migrationtools.ace_converter.ace_utils import printProgressBar,\
     set_excel_dict
@@ -288,17 +288,15 @@ class Parser():
                               name)
         grammer_8_2_10 = Group(Keyword('action') + name)
 
-        grammer_8_2 = Group(grammer_8_2_1 + ZeroOrMore(grammer_8_2_2 |
-                                                       grammer_8_2_3 |
-                                                       grammer_8_2_4 |
-                                                       grammer_8_2_5 |
-                                                       grammer_8_2_6 |
-                                                       grammer_8_2_7 |
-                                                       grammer_8_2_8 |
-                                                       grammer_8_2_9 |
-                                                       grammer_8_2_10))
+        grammer_8_3 = Group(Keyword('description') + restOfLine)
 
-        grammer_8 = Group(grammer_8_1 + ZeroOrMore(grammer_8_2))
+        grammer_8_2 = Group(grammer_8_2_1 + ZeroOrMore(
+            grammer_8_2_2 | grammer_8_2_3 | grammer_8_2_4 | grammer_8_2_5 |
+            grammer_8_2_6 | grammer_8_2_7 | grammer_8_2_8 | grammer_8_2_9 |
+            grammer_8_2_10))
+
+        grammer_8 = Group(grammer_8_1 + ZeroOrMore(grammer_8_3) +
+                          ZeroOrMore(grammer_8_2))
 
         # grammer9:
         # interface vlan 1011
@@ -365,10 +363,14 @@ class Parser():
         grammer_12_4 = Group(grammer_12_4_1 + ZeroOrMore(grammer_12_4_2))
         grammer_12_5 = Group(Keyword('predictor') + Keyword('leastconns') +
                              Keyword('slowstart') + num)
+        grammer_12_6 = Group(Keyword('description') + printables)
+        grammer_12_7 = Group(Keyword('predictor') + printables)
+        grammer_12_6 = Group(Keyword('description') + restOfLine)
+        grammer_12_7 = Group(Keyword('predictor') + restOfLine)
 
-        grammer_12 = Group(grammer_12_1 + ZeroOrMore(grammer_12_2 | grammer_12_2 |
-                                                     grammer_12_3 | grammer_12_4 |
-                                                     grammer_12_5))
+        grammer_12 = Group(grammer_12_1 + ZeroOrMore(
+            grammer_12_2 | grammer_12_2 | grammer_12_3 | grammer_12_4 |
+            grammer_12_5 | grammer_12_6 | grammer_12_7))
 
         # grammer ssl
         # ssl-proxy service SSL_CLIENT
@@ -790,3 +792,36 @@ class Parser():
         printProgressBar(file_size, file_size, msg,
                          prefix='Progress', suffix='')
         return final_dict
+
+if __name__ == '__main__':
+    s = """
+      policy-map type loadbalance first-match ISAM-AMWS_PRD_HTTPS-443_L7POLICY
+      description System: ISAM-AMWS - Type: PRD - Service: HTTPS-443
+      class class-default
+        sticky-serverfarm ISAM-AMWS_PRD_HTTPS-443_FARM_STICKY-SRCIP
+        action CLIENT_SOURCE_IP
+        ssl-proxy client SSL_INITIATION
+        """
+
+    name = Word(printables)
+    num = Word(nums)
+    serverfarm = Keyword('serverfarm')
+    host = Keyword('host')
+    grammer_12_1 = Group(serverfarm + host + name)
+    grammer_12_2 = Group(Keyword('probe') + name)
+    grammer_12_3 = Group(Keyword('inband-health') +
+                         Keyword('check') + name)
+    grammer_12_4_1 = Keyword('rserver') + ~Word('host') + name
+    grammer_12_4_2 = Keyword('inservice')
+    grammer_12_4 = Group(grammer_12_4_1 + ZeroOrMore(grammer_12_4_2))
+    grammer_12_5 = Group(Keyword('predictor') + Keyword('leastconns') +
+                         Keyword('slowstart') + num)
+    grammer_12_6 = Group(Keyword('description') + restOfLine)
+    grammer_12_7 = Group(Keyword('predictor') + restOfLine)
+
+    grammer = Group(grammer_12_1 + ZeroOrMore(
+        grammer_12_2 | grammer_12_2 | grammer_12_3 | grammer_12_4 |
+        grammer_12_5 | grammer_12_6 | grammer_12_7))
+
+    for match, start, end in grammer.scanString(s):
+        print match
