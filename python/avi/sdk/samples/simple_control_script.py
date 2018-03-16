@@ -1,5 +1,5 @@
-"""This scripts is a simple example of a control script. This control script is triggered by a 'Created SE' alert. 
-When the Alert triggers, it prints the alert json to a file and then makes an api call to retrieve the SE object info 
+"""This is a simple example of a control script. This control script is triggered by a 'Created SE' alert. 
+When the Alert triggers, it prints the alert json to a file. Then it makes an api call to retrieve the SE object info 
 and appends this info to the file"""
 
 
