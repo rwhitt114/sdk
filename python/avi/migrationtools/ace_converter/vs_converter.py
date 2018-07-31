@@ -12,7 +12,8 @@ PORT_END = 65535
 class VSConverter(object):
     """ Vsvip and Vs Conversion """
 
-    def __init__(self, parsed, tenant_ref, common_utils, enable_vs, cloud_ref, tenant, vrf_ref):
+    def __init__(self, parsed, tenant_ref, common_utils, enable_vs, cloud_ref,
+                 tenant, vrf_ref, segroup=None, cloud=None):
         self.parsed = parsed
         self.tenant_ref = tenant_ref
         self.common_utils = common_utils
@@ -22,6 +23,8 @@ class VSConverter(object):
         self.vrf_ref = vrf_ref
         self.http_policy_set = []
         self.data = ''
+        self.segroup = segroup
+        self.cloud = cloud
 
     def create_redirect_http_policy(self, name, data):
         real_name = name
@@ -205,26 +208,27 @@ class VSConverter(object):
                                          avi_obj="Refer "
                                                  "Class Map : {}".format(name))
 
-                            # finding the ips for vip
-                            ip_list = [ip]
-                            vip = []
-                            for ip in ip_list:
-                                vip.append({
-                                    "ip_address": {
-                                        "type": "V4",
-                                        "addr": ip
-                                    },
-                                    "vip_id": 0
-                                })
-                            if pool != '':
-                                pool_ref = self.common_utils.get_object_ref(
-                                    pool, 'pool', tenant=self.tenant)
+                # finding the ips for vip
+                ip_list = [ip]
+                vip = []
+                for ip in ip_list:
+                    vip.append({
+                        "ip_address": {
+                            "type": "V4",
+                            "addr": ip
+                        },
+                        "vip_id": 0
+                    })
+                if pool != '':
+                    pool_ref = self.common_utils.get_object_ref(
+                        pool, 'pool', tenant=self.tenant,
+                        cloud_name=self.cloud)
                 if not pool:
                     msg = 'No Pool configured for VS {}'.format(name)
                     # continue
                 if action:
                     http_policy_set = self.create_http_policy(action, name)
-                    http_policy_ref = self.common_utils.get_object_ref(object_name=http_policy_set['name'],
+                    http_policy_ref = self.common_utils.get_object_ref(object_name=http_policy_set.get('name'),
                                                                        object_type='httppolicyset', tenant=self.tenant)
                 else:
                     for sfarm in self.parsed.get('serverfarm'):
@@ -255,6 +259,12 @@ class VSConverter(object):
                     "tenant_ref": self.tenant_ref,
                     "type": "VS_TYPE_NORMAL"
                 }
+                if self.segroup:
+                    segroup_ref = self.common_utils.get_object_ref(self.segroup,
+                                                                   'serviceenginegroup',
+                                                                   tenant=self.tenant,
+                                                                   cloud_name=self.cloud)
+                    temp_vs['se_group_ref'] = segroup_ref
                 if pool_ref:
                     temp_vs['pool_ref'] = pool_ref
                 if l4_type:
@@ -288,7 +298,7 @@ class VSConverter(object):
 
         # get the number of vips available
         for class_map in self.parsed.get('class-map', ''):
-            if 'match-all' not in class_map.values():
+            if 'match-all' not in class_map.values() and 'match-any' not in class_map.values():
                 LOG.warning('This type of class map not supported : %s' %
                             class_map['class-map'])
                 update_excel(
@@ -358,9 +368,9 @@ class VSConverter(object):
                     vs_ip = class_map['desc'][0].get('virtual-address', [])
                     if vs_ip:
                         vs_ip_temp = '{}-vip'.format(vs_ip)
-                        vs_ref = self.common_utils.get_object_ref(vs_ip_temp,
-                                                                  'vsvip',
-                                                                  tenant=self.tenant)
+                        vs_ref = self.common_utils.get_object_ref(
+                            vs_ip_temp, 'vsvip', tenant=self.tenant,
+                            cloud_name=self.cloud)
         return vs_ref, port, vs_ip, l4_type
 
     def virtual_service_conversion(self, data):

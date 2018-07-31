@@ -11,6 +11,7 @@ from avi.migrationtools.netscaler_converter.ns_constants \
 from avi.migrationtools.netscaler_converter.monitor_converter \
     import merge_object_mapping
 from avi.migrationtools.netscaler_converter.ns_util import NsUtil
+from avi.migrationtools.avi_migration_utils import update_count
 
 LOG = logging.getLogger(__name__)
 # Creating f5 object for util library.
@@ -360,7 +361,8 @@ class ProfileConverter(object):
                 if obj.get('accepted_ciphers', None):
                     # Todo supported only valid ciphers
                     ssl_profile['accepted_ciphers'] = obj.get(
-                                                        'accepted_ciphers')
+                        'accepted_ciphers')
+                    ssl_profile['description'] = obj.get('ciphersuite')
                     # ssl_profile['accepted_ciphers'] = 'AES:3DES:RC4'
                 if obj.get('cert', None):
                     avi_config["SSLKeyAndCertificate"].append(obj.get('cert'))
@@ -408,6 +410,7 @@ class ProfileConverter(object):
                     full_set_ssl_service_command, conv_status, ssl_profile)
                 LOG.debug("SSL profile conversion completed")
             except:
+                update_count('error')
                 LOG.error("Error in conversion of SSL Profile", exc_info=True)
             msg = "SSL Service conversion started..."
             ns_util.print_progress_bar(self.progressbar_count, self.total_size,
@@ -446,6 +449,7 @@ class ProfileConverter(object):
             LOG.debug("Conversion completed successfully for httpProfile: %s" %
                       prof_name)
         except:
+            update_count('error')
             LOG.error("Error in convertion of httpProfile", exc_info=True)
 
         return app_profile
@@ -483,6 +487,7 @@ class ProfileConverter(object):
                 "tenant_ref": self.tenant_ref
             }
         except:
+            update_count('error')
             LOG.error("Error in convertion of tcpProfile", exc_info=True)
         return ntwk_profile
 
@@ -712,11 +717,13 @@ class ProfileConverter(object):
                     skipped_status = 'Skipped: Key and certificate not ' \
                                      'generated : %s' % full_cmd
             elif 'cipherName' in mapping.keys():
-                ciphers_keys = self.get_ciphers(mapping['cipherName'],
-                                                ns_config)
+                ciphers_keys, ciphersuite = self.get_ciphers(
+                    mapping['cipherName'], ns_config)
                 ciphers += ciphers_keys
                 ciphers = list(set(ciphers))
                 obj['accepted_ciphers'] = ':'.join(ciphers)
+                if ciphersuite:
+                    obj['ciphersuite'] = ciphersuite
                 bind_ssl_success = True
                 output = obj
                 if not obj['accepted_ciphers']:
@@ -754,9 +761,9 @@ class ProfileConverter(object):
         This function is define to get the ssl ciphers
         :param cipher: cipher name
         :param ns_config: netscalar configuration
-        :return: list of ciphers
+        :return: list of ciphers, cipher-suite name
         """
-
+        ciphersuite = None
         cipher_config = ns_config.get('add ssl cipher', {})
         cipher_mapping = ns_config.get('bind ssl cipher', {})
         lb_cipher = cipher_config.get(cipher, None)
@@ -765,7 +772,9 @@ class ProfileConverter(object):
         bind_ssl_cipher_command = 'bind ssl cipher'
         # added default ssl ciphers
         if not (lb_cipher and bind_ciphers):
-            return ['AES:3DES:RC4']
+            return ['AES:3DES:RC4'], ciphersuite
+        if lb_cipher:
+            ciphersuite = lb_cipher['attrs'][0]
         ciphers = []
         full_add_ssl_cipher_command = \
             ns_util.get_netscalar_full_command(add_ssl_cipher_command,
@@ -832,6 +841,6 @@ class ProfileConverter(object):
                     skipped_status)
 
         if not ciphers:
-            return [cipher]
+            return [cipher], ciphersuite
 
-        return ciphers
+        return ciphers, ciphersuite

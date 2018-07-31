@@ -17,6 +17,7 @@ from avi.migrationtools.netscaler_converter.monitor_converter \
 from avi.migrationtools.netscaler_converter.profile_converter import \
     app_merge_count
 from avi.migrationtools.netscaler_converter.ns_util import NsUtil
+from avi.migrationtools.avi_migration_utils import update_count
 
 LOG = logging.getLogger(__name__)
 tmp_policy_ref = []
@@ -89,7 +90,6 @@ class CsvsConverter(object):
         lbvs_avi_conf = avi_config['VirtualService']
         lb_vs_mapped = []
         cs_vs_list = []
-        avi_config['StringGroup'] = []
         # get the total size of object.
         self.progressbar_count = len(lb_vs_conf)
         self.total_size = len(lb_vs_conf) + len(cs_vs_conf)
@@ -190,7 +190,7 @@ class CsvsConverter(object):
                                                     'serviceenginegroup',
                                                     tenant=self.tenant_name,
                                                     cloud_name=self.cloud_name)
-                    vs_obj['segroup_ref'] = se_group_ref
+                    vs_obj['se_group_ref'] = se_group_ref
                 if parse_version(self.controller_version) >= parse_version(
                         '17.1'):
                     vs_obj['vip'] = [vip]
@@ -604,6 +604,7 @@ class CsvsConverter(object):
                 LOG.debug("Context Switch VS conversion completed for: %s"
                           % key)
             except:
+                update_count('error')
                 LOG.error('Error in cs vs conversion for: %s' % key,
                           exc_info=True)
             # Calling progress bar function.

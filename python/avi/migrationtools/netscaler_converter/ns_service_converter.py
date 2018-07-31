@@ -12,6 +12,7 @@ from avi.migrationtools.netscaler_converter.ns_constants \
 from avi.migrationtools.netscaler_converter.monitor_converter \
     import merge_object_mapping
 from avi.migrationtools.netscaler_converter.ns_util import NsUtil
+from avi.migrationtools.avi_migration_utils import update_count
 app_per_merge_count = {'count': 0}
 
 LOG = logging.getLogger(__name__)
@@ -211,6 +212,7 @@ class ServiceConverter(object):
                     avi_config['PoolGroup'].append(pool_group)
 
             except Exception as e:
+                update_count('error')
                 LOG.error('Error in bind lb vserver conversion bound to: %s' %
                           group_key, exc_info=True)
             msg = "PoolGroup Conversion started..."
@@ -450,8 +452,7 @@ class ServiceConverter(object):
                 elif service.get('attrs') and len(service['attrs']) >= 2 and \
                         'SSL' in service['attrs']:
                     pool_obj['ssl_profile_ref'] = ns_util.get_object_ref(
-                            'System-Standard', OBJECT_TYPE_SSL_PROFILE,
-                            self.tenant_name)
+                            'System-Standard', OBJECT_TYPE_SSL_PROFILE, 'admin')
                 # Remove health monitor reference of http type if pool
                 # has ssl profile or pki profile or ssl cert key
                 # ELSE remove health monitor of https type
@@ -487,6 +488,7 @@ class ServiceConverter(object):
                     service['line_no'], service_command, service_name,
                     service_netscalar_full_command, conv_status, pool_obj)
             except:
+                update_count('error')
                 LOG.error('Error in pool conversion for: %s' % key,
                           exc_info=True)
             # Calling progressbar function.
@@ -611,8 +613,7 @@ class ServiceConverter(object):
                 elif (service_group.get('attrs') and len(service_group['attrs'])
                         >= 2 and 'SSL' in service_group['attrs']):
                     pool_obj['ssl_profile_ref'] = ns_util.get_object_ref(
-                        'System-Standard', OBJECT_TYPE_SSL_PROFILE,
-                        self.tenant_name)
+                        'System-Standard', OBJECT_TYPE_SSL_PROFILE, 'admin')
                 # Remove health monitor reference of http type if pool
                 # has ssl profile or pki profile or ssl cert key
                 # ELSE remove health monitor of https type
@@ -654,6 +655,7 @@ class ServiceConverter(object):
                     service_group_name, service_group_netscalar_full_command,
                     conv_status, pool_obj)
             except:
+                update_count('error')
                 LOG.error('Error in pool conversion for: %s' % group_key,
                           exc_info=True)
             # Calling progress bar function.
@@ -915,6 +917,7 @@ class ServiceConverter(object):
                     ip_addr = socket.gethostbyname(ip_addr)
                     server_obj['ip']['addr'] = ip_addr
                 except:
+                    update_count('warning')
                     # Skipped this server if it does not have an Ip
                     ns_util.add_status_row(
                         server['line_no'], ns_add_server_command, server['attrs'][0],
